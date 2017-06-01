@@ -1,34 +1,37 @@
+"""Recreates Figure 3A from bioRxiv: 144683 (Federer & Zylberbeg 2017) """
+
 from NeuralNetwork import NN
 from NetworkSimulation import Sim
 import pandas as pd
 import numpy as np
 import quantify_sims_multithreading as pq
 from scipy import stats
-
-import time 
+from arg_parsing import get_args
+import time
+from the_generic_plotter import  plot_multidim 
 
 def avg(x):
+    """ Returns avg"""
     return sum(x) / len(x)
 
 def initialize_file(loc, cols):
+    """ initializes a file with column names """
     f = open(loc, 'a+')
     f.write(cols+'\n')
     f.close()
 
-## network params 
-n_stim = 4
-n_neurons = 100
-ms = 100
-n_iters = 2
-dt = .001
-eta = .0001
+### command line arguments, all defaults set otherwise 
+args = get_args()
+if(args.n_stim <= 1): ### not multidim results if only one stim 
+    args.n_stim = 4
 r = str(np.random.randn())
 
-stim_cols = list(range(ms))
+### create files for storing stim values
+stim_cols = list(range(args.ms))
 stim_cols = ','.join(['%.5f' % num for num in stim_cols])
 t_stims = list()
 u_stims = list()
-for i in range(n_stim):
+for i in range(args.n_stim):
     l3 = 'storing/relu_stims_'+ str(i+1) + '_' + r + '.csv'
     t_stims.append(l3)
     initialize_file(l3, stim_cols)
@@ -36,42 +39,33 @@ for i in range(n_stim):
     u_stims.append(l4)
     initialize_file(l4, stim_cols)
                 
-tt = pq.PQ(n_iters=n_iters, stim_l = t_stims, n_neurons=n_neurons,
-    ms=ms, dt=dt, eta=eta, n_stim=4, plastic_synapse=True)
-ut = pq.PQ(n_iters=n_iters, stim_l = u_stims, n_neurons=n_neurons, ms=ms, dt=dt,n_stim=4, plastic_synapse=False)
+tt = pq.PQ(n_iters=args.n_iters, stim_l = t_stims, n_neurons=args.n_neurons,
+    ms=args.ms, dt=args.dt, eta=args.eta, n_stim=args.n_stim, plastic_synapse=True)
+ut = pq.PQ(n_iters=args.n_iters, stim_l = u_stims, n_neurons=args.n_neurons, ms=args.ms, dt=args.dt,n_stim=args.n_stim, plastic_synapse=False)
 
+## run networks in parallel
 print('Time to run tuned ' + str(tt/60) + ' minutes')
 print('Time to run untuned ' + str(ut/60) + ' minutes')
 
+## create lists for plots 
 tdfs = list()
 udfs = list()
 tLabels = list()
 uLabels=list()
-dfs = list()
-labels = list()
 
-for i in range(n_stim):
+for i in range(args.n_stim):
     ## open and read stim
     ts = pd.read_csv('storing/relu_stims_'+ str(i+1) + '_' + r + '.csv')
     tdfs.append(pd.DataFrame.transpose(ts))
-    dfs.append(pd.DataFrame.transpose(ts))
     us = pd.read_csv('storing/constant_stims_'+ str(i+1) + '_' + r + '.csv')
     udfs.append(pd.DataFrame.transpose(us))
-    dfs.append(pd.DataFrame.transpose(us))
-    ## append to phi list
     tLabels.append('Plastic Random Synapse S' + str(i+1))
-    labels.append('Plastic Random Synapse S' + str(i+1))
     uLabels.append('Constant Random Synapse S' + str(i+1))
-    labels.append('Constant Random Synapse S' + str(i+1))
-  
+
+## plot Fig 3A  
 colors = ['orangered', 'blue', 'green', 'purple']
 a_colors = ['#ff9999','#8080ff', '#c6ecd7','#ccb3e6']
-
-import sys
-sys.path.insert(0, 'plotting/')
-from the_generic_plotter import  plot_multidim 
-
-plot_multidim(tdfs, udfs, tLabels, uLabels, colors=colors, xspot = 3000, 
+plot_multidim(tdfs, udfs, tLabels, uLabels, colors=colors,
              a_colors = a_colors, yadds=[-.1, 0, -.05, .05], ylim=[-.15, 1.1])
 
 

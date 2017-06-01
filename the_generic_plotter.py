@@ -1,17 +1,13 @@
 from NeuralNetwork import NN
 from NetworkSimulation import Sim
 import numpy as np
-import math
 import matplotlib.pyplot as plt
 import matplotlib as mpl 
 import pylab
 from matplotlib import rc
-from scipy import stats
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.colors as colors
-from mpl_toolkits.axes_grid1.inset_locator import mark_inset
-import matplotlib.cm as cmx
 from matplotlib.patches import Rectangle
+from scipy import stats
 mpl.rc('font', family='Arial')
 ylabel_size = 20
 xlabel_size = 20
@@ -37,7 +33,6 @@ def plot_activities(stimsu, actsu, stimst,  actst, dt=.01, tau=1):
     txtcolor = 'black'
     blue = 'blue'
     red = 'red'
-    print(len(actsu))
     x = list(range(len(actsu)))
     fig = plt.figure(1)
     fig.text(0.06, 0.5, 'Firing Rates $r_i$' , ha='center', va='center', rotation='vertical', fontsize=ylabel_size, color=txtcolor, fontweight='bold')
@@ -72,7 +67,6 @@ def plot_activities(stimsu, actsu, stimst,  actst, dt=.01, tau=1):
     currentAxis = plt.gca()
     for i in range(len(xspots)):
         currentAxis.add_patch(Rectangle((xspots[i], -.5), height, 3, facecolor="lightgrey", edgecolor=blue)) ### add gray bars
-        print(str(np.round(stimst[0][int(xspots[i])], 2)))
         plt.text(txspots[i], tyspot, r'$s = \sum_{i=0} d_i r_i$' +'=' + str(np.round(stimst[0][int(xspots[i])], 2)), color=blue,fontsize =txtlabel_size, fontweight='bold') ### add text 
     for i in range(len(actst.columns)):
         a, = plt.plot(x,actst[i], red, linestyle='--', linewidth=2.0)
@@ -85,70 +79,10 @@ def plot_activities(stimsu, actsu, stimst,  actst, dt=.01, tau=1):
     plt.close() 
     return True
 
-
-def plot_quant_fractuned(dfs, folder, bar_labels, labels, dt=.01, tau=1, show=True, save=True, key=None,
-                         xlabel='Time (ms)', inset=False):
-    """ plots least tuned to most tuned """
-    txtcolor = 'black'
-    colors = d_colors
-    a_colors = da_colors
-    if key is None:
-        key = ''
-    means = list()
-    errors = list()
-    for i in range(len(dfs)):
-        means.append(dfs[i].mean(axis=1).as_matrix())
-        errors.append(stats.sem(dfs[i].as_matrix().transpose()))
-    fig = plt.figure()
-    x = list(range(len(dfs[0])))
-    xspot = len(x) / 2
-    fig.patch.set_color(color)
-    ax = fig.add_subplot(111)
-    ax.set_xlim([0, len(x)])
-    ax.set_title(' ')
-    ax.set_ylabel('Ratio of Remembered Stimulus Values', fontsize=ylabel_size, fontweight='bold')
-    ax.set_xlabel(xlabel, fontsize=xlabel_size, color=txtcolor, fontweight='bold')
-    pylab.ylim([-.2, 1.1])
-    #ax.set_ylim([-1, 2.0])
-    xspots = [2500, 50]
-    j = 0 
-    scalarMap = cmx
-    for i in range(len(dfs)):
-        a, = plt.plot(x, means[i], color=colors[i],  linewidth=linewidth)
-        plt.fill_between(x, means[i] - errors[i], means[i] + errors[i], color=a_colors[i])
-        if(i==0 or i ==len(dfs)-1):
-            yspot = means[i][len(x)-1] 
-            #print('(x,y): ' + '(' + str(xspot) + ',' + str(yspot) + ')')
-            #print('Label : ' + str(labels[i]))
-            plt.text(xspots[j], yspot, labels[i], color=colors[i], fontsize=txtlabel_size, fontweight='bold')
-            j += 1
-    if(inset):
-        #xspots = np.linspace(100, 2500, 10)
-        xspots = [2500, 2500, 2500, 2500,1887.5, 1887.5, 1275, 662.5, 50]
-        j = 0 
-        a = plt.axes([.15, .3,  .725, .48])
-        for i in range(1, len(dfs)-1):
-            t, = plt.plot(x, means[i], color=colors[i],  linewidth=linewidth)
-            yspot = means[i][len(x)-1] +.0005
-            plt.text(xspots[j], yspot, labels[i], color=colors[i], fontsize=txtlabel_size-3, fontweight='bold')
-            j+=1 
-        plt.xticks([])
-        plt.yticks([])
-    plt.setp(ax.get_xticklabels(), fontsize=tick_label_size)
-    plt.setp(ax.get_yticklabels(), fontsize=tick_label_size)
-    if(save):
-        loc = 'Plots/' + folder + '/' + key + str(np.random.randn()) 
-        save_plot(loc)
-    if(show):
-        plt.show()
-    plt.close()
-    return True 
-
 def plot_stims(dfs, labels, colors=None, a_colors = None, dt=.01, xlabel=None,
                ylabel = None, plt_errors=True, yadds=None, 
                label_size=None, ylim = None, xspot = None):
     if colors is None:
-        print('True')
         colors = d_colors
     if a_colors is None:
         a_colors = da_colors
@@ -171,9 +105,8 @@ def plot_stims(dfs, labels, colors=None, a_colors = None, dt=.01, xlabel=None,
     ax.set_xlabel(xlabel, fontsize=xlabel_size, fontweight='bold')
     ax.set_ylabel(ylabel, fontsize=ylabel_size, fontweight='bold')
     x = list(range(len(dfs[0])))
-    print(len(x))
     if(xspot is None):
-        xspot = len(x) / 3
+        xspot = len(x) 
     else:
         xspot = xspot
     pylab.xlim([0, len(x)-1])
@@ -184,7 +117,6 @@ def plot_stims(dfs, labels, colors=None, a_colors = None, dt=.01, xlabel=None,
     elif(type(yadds) is not list):
         yadds = np.repeat(yadds, len(dfs))
     for i in range(len(dfs)):
-        print(len(means[i]))
         t, = plt.plot(x, means[i], colors[i], label = labels[i], linewidth=linewidth)
         if(plt_errors):
             plt.fill_between(x, means[i] - errors[i], means[i] + errors[i], color=a_colors[i])
@@ -224,9 +156,9 @@ def plot_multidim(tdfs, udfs, tlabels, ulabels, errors=True, colors=None, a_colo
     x = list(range(len(tdfs[0])))
     
     if (xspot is None):
-        xspot = len(x) - len(x) / 2
+        xspot = len(x) 
     else:
-        xspot = xspot 
+        xspot = xspot
     pylab.xlim([0, len(x)-1])
     if(yadds is None):
         yadds = np.repeat(0, len(tdfs))
