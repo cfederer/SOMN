@@ -1,3 +1,4 @@
+""" A neural network object """
 import numpy as np
 import math
 from scipy import linalg
@@ -7,7 +8,8 @@ import math
 
 def avg(x):
     """ Returns the average of x """
-    return sum(x) / len(x)
+    x2 = copy.deepcopy(x)
+    return sum(x2) / len(x2)
 
 def vect_pinv(v):
     """ Takes the Moore-Penrose pseudoinverse of a vector v"""
@@ -15,6 +17,14 @@ def vect_pinv(v):
     vTv = np.dot(vT, v)
     vpinv = np.true_divide(vT, vTv)
     return(vpinv)
+
+def binary_updates(x):
+    """ returns sign(x) """
+    if(x < 0):
+        return -1
+    if(x>0):
+        return 1
+    return 0 
 
 def apply_mask(the_mask, the_matrix):
     """ Multiples a mask matrix to the matrix to be masked """
@@ -34,156 +44,106 @@ def add_noise(to, size):
 
 def relu(x):
     """ Return x if x>0, else 0"""
-    return np.maximum(0,x)
+    x2 = copy.deepcopy(x)
+    return np.maximum(0,x2)
 
 def d_relu(x):
     """ Return 1 if x >0, else 0 """
-    x[x>0] = 1
-    x[x<0] = 0
-    return x
+    x2 = copy.deepcopy(x)
+    x2[x2>0] = 1
+    x2[x2<0] = 0
+    return x2
 
 class NN(object):
-    """ A rate-based neural network.
+    def __init__(self, args):
+        """ Return a new NN object from specified parameters """
+        if 'seed' in args:
+            np.random.seed(args['seed'])
+        if(args['FEVER']):
+            args['activation'] = ['linear']
+        args['a'] = np.random.randn(args['n_neurons'], 1)
+        if(args['activation'] == 'relu'):
+            args['r'] = relu(args['a'])
+        else:
+            args['r'] = args['a']
 
-    Attributes:
-        n_neurons: number of neurons in the network
-        plastic_synapse (False): If synapses are plastic or not
-        activation (relu): activation function for the firing rates of the neurons, can also run as linear 
-        seed (None): optional seed for random initializations
-        FEVER (False): boolean initialize with FEVER requirement d = d*L
-        n_stim (None): number of stim, default 1
-        a (None): activity vector (avg firing rate),  default random guassian
-        d (None): weighted contribution of neurons to stim for updates, default random gaussian
-        L (None): connectivity matrix, default random guassian with variance sqrt(n)
-        q (None): weighted contribution of neurons to stim for stim calculation, default random gaussian
-                  (same as d unless rws == True)
-        frac_tuned (1): fraction of neurons to be tuned
-        L_noise (0): amplitude of noise to be added to the synapse
-        rws (False): use random feedback weights (q != d)
-        connectivity (1): fraction of synapses to be connected 
-    """
+        if 'd' not in args:
+            if(args['abs_d']):
+                args['d'] = abs(np.random.randn(args['n_neurons'], args['n_stim']))
+            else: 
+                args['d'] = np.random.randn(args['n_neurons'], args['n_stim'])
+
+        if(args['rws']):
+            if(args['abs_d']):
+                args['q'] = abs(np.random.randn(args['n_neurons'], args['n_stim']))
+            else: 
+                args['q'] = np.random.randn(args['n_neurons'], args['n_stim'])
+        else:
+            args['q'] = args['d']
+            
+        if(args['FEVER']):
+            dpinv = vect_pinv(args['d'])
+            args['L'] = np.outer(args['d'], dpinv)
+        else:
+            if 'L' not in args:
+                args['L'] = np.random.randn(args['n_neurons'], args['n_neurons'])
+                args['L'] = np.divide(args['L'], math.sqrt(args['n_neurons'])) 
+        if(args['connectivity'] != 1):
+            args['connectivity_mask'] = mask_matrix(args['n_neurons'], args['connectivity'])
+        if(args['frac_tuned'] != 1):
+            args['mask'] = mask_matrix(args['n_neurons'], args['frac_tuned'])
+            
+        self.args = args
         
-    def __init__(self, NN_copy=None, n_neurons=None, plastic_synapse=False, activation = 'relu',  seed = None,
-                 FEVER=False, n_stim=None, a = None, d= None, L=None, q=None, frac_tuned=1, L_noise = 0, rws = False, connectivity = 1):
-        """ Return a new NN object from specified parameters or copies parameters from NN_copy (but with unique a,d,L,q) """
-        if(NN_copy is None):
-            ###### NETWORK SETUP ######
-            self.n_neurons = n_neurons
-            self.plastic_synapse = plastic_synapse
-            self.FEVER = FEVER
-            if(FEVER):
-                self.activation = 'linear'
-            else:
-                self.activation = activation 
-            if seed is not None:
-                np.random.seed(seed)
-            if n_stim is None:
-                if d is None:
-                    self.n_stim = 1
-                else:
-                    self.n_stim = d.shape[1]
-            else:
-                self.n_stim = n_stim
-            self.connectivity = connectivity
-            self.frac_tuned = frac_tuned
-            self.L_noise = L_noise
-        else:
-            self.n_neurons = NN_copy.n_neurons
-            self.plastic_synapse = NN_copy.plastic_synapse
-            self.FEVER = NN_copy.FEVER
-            self.n_stim = NN_copy.n_stim
-            self.activation = NN_copy.activation
-            self.connectivity = NN_copy.connectivity
-            self.rws = NN_copy.rws
-            self.frac_tuned = NN_copy.frac_tuned
-            self.L_noise = NN_copy.L_noise 
-        ###### RANDOM INITIALIZATIONS ######
-        if(a is None or NN_copy):
-            self.a = np.random.randn(self.n_neurons, 1)
-        else:
-            self.a = a 
-        if(self.activation=='relu'):
-            self.r = relu(self.a)
-        else:
-            self.r = self.a
-        if(d is None or NN_copy):
-            self.d = abs(np.random.randn(self.n_neurons, self.n_stim))
-        else:
-            self.d = d
-        self.rws = rws 
-        if(rws):
-            if (NN_copy or q is None):
-                self.q = abs(np.random.randn(self.n_neurons, self.n_stim))
-            else:
-                self.q = q 
-        else:
-            self.q = self.d 
-        if(FEVER):
-            dpinv = vect_pinv(self.d)
-            self.L = np.outer(self.d, dpinv)
-        elif(NN_copy or L is None):
-            L = np.random.randn(self.n_neurons, self.n_neurons)
-            self.L = np.divide(L, math.sqrt(self.n_neurons)) 
-        else:
-            self.L = L
-        if(self.connectivity < 1):
-            self.connectivity_mask = mask_matrix(self.n_neurons, connectivity)
-        if(self.frac_tuned != 1):
-            self.mask = mask_matrix(self.n_neurons, frac_tuned)   
-    
     def calc_s(self):
         """ Calculate and return the rememberd stim value (Equation 5) q==d unless rws==True """
-        return np.dot(np.transpose(self.r), self.q)
+        return np.dot(np.transpose(self.args['r']), self.args['d'])
 
-    def update_a(self, dt):
+    def update_a(self):
         """ Update activity of network (Equation 1) """
-        r = copy.deepcopy(self.r)
-        L = copy.deepcopy(self.L)
-        self.a = self.a*(1-dt) + dt*(np.dot(L,r))
+        self.args['a'] = self.args['a']*(1-self.args['dt']) + self.args['dt']*(np.dot(self.args['L'], self.args['r']))
 
     def update_r(self):
         """ Update firing rates of network """
-        a = copy.deepcopy(self.a)
-        if(self.activation=='relu'): 
-            self.r = relu(a)
+        if(self.args['activation']=='relu'): 
+            self.args['r'] = relu(self.args['a'])
         else: ##linear 
-            self.r = a
+            self.args['r'] = self.args['a']
 
     def drdt(self):
         """ Calculate and return the derivative of the firing rates """
-        a = copy.deepcopy(self.a)
-        if(self.activation=='relu'):
-            return d_relu(a)
+        if(self.args['activation']=='relu'):
+            return d_relu(self.args['a'])
         else: ##linear 
             return 1 
 
     def calc_dsdt(self):
         """ Calculate and return change in stim """
-        a = copy.deepcopy(self.a)
-        L = copy.deepcopy(self.L)
-        d = copy.deepcopy(self.d)
-        r = copy.deepcopy(self.r)
         drdt = self.drdt()
-        if(self.n_stim >1):
-            dsdt = (np.transpose(np.dot(np.transpose(d*d_relu(copy.deepcopy(a))),  (-a + np.dot(L,r)))))[0]
+        if(self.args['n_stim'] >1):
+            dsdt = (np.transpose(np.dot(np.transpose(self.args['d']*d_relu(self.args['a'])),  (-self.args['a'] + np.dot(self.args['L'],self.args['r'])))))[0]
         else:
-            dsdt = np.vdot(d*d_relu(copy.deepcopy(a)), (-a + np.dot(L,r)))
+            dsdt = np.vdot(self.args['d']*d_relu(self.args['a']), (-self.args['a'] + np.dot(self.args['L'],self.args['r'])))
+        if(self.args['error'] == 'binary'):
+            return(binary_updates(dsdt))
         return dsdt 
         
-    def update_L(self, eta):
+    def update_L(self):
         """ Update the connectivity matrix, L (Equation 3, 4) """
-        a = copy.deepcopy(self.a) 
-        r = copy.deepcopy(self.r)
         drdt = self.drdt()
-        d = copy.deepcopy(self.d)
         dsdt = self.calc_dsdt()
-        dL = (np.repeat(np.dot(d,dsdt), self.n_neurons)).reshape(self.n_neurons,self.n_neurons) 
-        dL = dL * 2 * eta * np.transpose(r) * drdt
-        if(self.L_noise != 0):
-            dL += add_noise(dL, self.L_noise)
-        if(self.frac_tuned != 1):
-            self.L = self.L - apply_mask(self.mask, dL)
+        dL = (np.repeat(np.dot(self.args['q'],dsdt), self.args['n_neurons'])).reshape(self.args['n_neurons'],self.args['n_neurons']) 
+        dL = dL * 2 * self.args['eta'] * np.transpose(self.args['r']) * drdt
+        if(self.args['L_noise'] != 0):
+            if(self.args['FEVER']):
+                dL = self.args['L_noise'] * np.random.normal()
+            elif(self.args['noise_amp'] == 'alpha'):
+                dL = dL + self.args['L_noise'] * np.random.normal()
+            else: 
+                dL += add_noise(dL, self.args['L_noise'])
+        if(self.args['frac_tuned'] != 1):
+            self.args['L'] = self.args['L'] - apply_mask(self.args['mask'], dL)
         else:
-            self.L = self.L - dL 
-        if(self.connectivity < 1):
-            self.L = apply_mask(self.connectivity_mask, self.L)
+            self.args['L'] = self.args['L'] - dL 
+        if(self.args['connectivity'] < 1):
+            self.args['L'] = apply_mask(self.args['connectivity_mask'], self.args['L'])
