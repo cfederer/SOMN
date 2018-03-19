@@ -50,17 +50,18 @@ fever_stims = pd.DataFrame(np.ones((tuned_stims.shape[0], tuned_stims.shape[1]))
 
 ## plot Fig 2B
 dfs = [tuned_stims, constant_stims,  fever_stims]
-pa = plot_args(FEVER=True, rb=False)
+pa = plot_args(FEVER=True, rb=False, poster=True)
 pa['labels'] = ['Plastic Random Synapse','Constant Random Synapse', 'FEVER']
 pa['ylim'] = [-.1, 1.15]
 pa['xspot'] = 380
 pa['right_margins'] = False
 pa['plt_errors'] = True
 pa['yadds'] = [-.1, .04, .03]
+pa['save'] = True
 plot_pqs(dfs, pa)
 
 ## plot zoomed 2C
-paz = plot_args(rb=False)
+paz = plot_args(rb=False, poster=True)
 dfs = [tuned_stims, fever_stims]
 paz['labels'] = ['Plastic Random Synapse', 'FEVER']
 paz['yadds'] = [.00022, .00003]
@@ -69,6 +70,7 @@ paz['yadds'] = [.00055, -.0003]
 paz['right_margins'] = False
 paz['plt_errors'] = True
 paz['xspot'] = 500
+paz['save'] = True
 paz['ylabel'] = ''
 paz['colors'] = [pa['colors'][0], pa['colors'][2]]
 plot_pqs(dfs, paz)

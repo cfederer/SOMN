@@ -31,6 +31,11 @@ def mask_matrix(x, y, frac_tuned):
 def get_args():
     """ default arguments for a network simulation """
     a = dict()
+    ## chaos
+    a['gee'] = 1
+    a['gei'] = 1
+    a['gie'] = 1
+    a['gii'] = 1
     a['tuned'] = True                            ## plastic random synapses, False for constant random synapses
     a['ms'] = 20                               ## ms to run simulation for
     a['vthr'] = -50
@@ -54,6 +59,7 @@ def get_steps(args):
 
 class NN(object):
     def __init__(self, args):
+        
         ## timing
         args['steps'] = int(args['ms'] / (args['dt'] * args['tau'] * 20))
         args['stepsperms'] = 1 / (args['dt']*args['tau']*20)
@@ -64,13 +70,14 @@ class NN(object):
         args['ve'] = np.random.randint(args['vreset'], args['vthr']+10, size=(args['ne']))
         args['vi'] = np.random.randint(args['vreset'], args['vthr']+10, size=(args['ni']))
         args['d'] = abs(np.random.randn(args['ne'], 1))
-        args['lee'] = relu(np.random.randn(args['ne'], args['ne']))
+        args['lee'] = relu(np.random.randn(args['ne'], args['ne'])) *(args['gee'] /  math.sqrt(args['ne']))
         np.fill_diagonal(args['lee'], 0)
-        args['lii'] = relu(np.random.randn(args['ni'], args['ni']))
+        print(args['lee'])
+        args['lii'] = relu(np.random.randn(args['ni'], args['ni'])) *(args['gii'] /  math.sqrt(args['ni']))
         np.fill_diagonal(args['lii'], 0)
-        args['lei'] = relu(np.random.randn(args['ne'], args['ni'])) / math.sqrt(args['ne'])
+        args['lei'] = relu(np.random.randn(args['ne'], args['ni'])) *(args['gei'] /  math.sqrt(args['ne']))
         np.fill_diagonal(args['lei'], 0)
-        args['lie'] = relu(np.random.randn(args['ni'], args['ne'])) / math.sqrt(args['ni'])
+        args['lie'] = relu(np.random.randn(args['ni'], args['ne'])) *(args['gie'] /  math.sqrt(args['ni']))
         np.fill_diagonal(args['lie'], 0)
         args['mee'] = np.zeros((args['ne'], args['ne']))
         args['mii'] = np.zeros((args['ni'], args['ni']))

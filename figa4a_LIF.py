@@ -4,9 +4,9 @@ from qm import *
 from plot_util import *
 
 ms = 3000
-n_iters = 10
+n_iters = 1
 ############## UNCOMMENT TO RUN NEW RESULTS #############
-'''
+
 argst = get_args()
 argst['ms'] = ms
 argst['tuned'] = True
@@ -31,7 +31,7 @@ print('tuned')
 tt = PQ(argst, stim_l = t_stim)
 print('untuned')
 ut = PQ(argsu, stim_l = u_stim)
-'''
+
 ############## PLOT STORED RESULTS #############
 t_stim = ['storing/plastic_stim_LIF.csv']
 u_stim = ['storing/constant_stim_LIF.csv']

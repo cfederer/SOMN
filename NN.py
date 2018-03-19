@@ -10,6 +10,7 @@ import pandas as pd
 def get_args():
     """ default arguments for a network simulation """
     args_dict = dict()
+    args_dict['g'] = 1                                   ## chaotic > 1
     args_dict['error'] = 'derived'                       ## error is (ds/dt)^2; other option is 'binary' for sign(dsdt)
     args_dict['tuned'] = True                            ## plastic random synapses, False for constant random synapses
     args_dict['ms'] = 3001                               ## ms to run simulation for
@@ -27,23 +28,19 @@ def get_args():
     args_dict['connectivity'] = 1                        ## connection probability
     args_dict['FEVER'] = False                           ## runs FEVER like entwork (Druckmann & Chklovskii Curr Biol 2012)
     args_dict['updates'] = False                         ## get printed updates while running 
-    args_dict['alpha'] = 0                               ## amplitude of synaptic noise 
+    args_dict['alpha'] = 0                               ## amplitude of synaptic noise
+    args_dict['v_alpha'] = 0                             ## amplitude of voltage / activity noise 
     args_dict['rws'] = False                             ## random feedback weights, d == q, if False: d != q
     args_dict['pretune'] = 0                             ## number of previous stim to train on 
     args_dict['n_iters'] = 10                            ## number of times to run if quantifying remembered value relative to initial 
-    args_dict['L_hist'] = False                          ## store values at 3 times to make histogram of synaptic weights 
-    args_dict['dL_hist'] = False                         ## store values at 3 times to make histogram of synaptic weights updates 
     args_dict['delay'] = False                           ## add delay for error signal to reach synaptic update s
     args_dict['delay_ms'] = 1                            ## ms of delay 
-    args_dict['store_weights'] = False                   ## store subset of weights across entire training
-    args_dict['nLs'] = 10                                ## number of randomly selected weights to store 
     return args_dict 
 
 
 def get_paper_seed():
     """ Seed used in paper to exactly recreate Figure 2A """
     return 19 
-
 
 def avg(x):
     """ Returns the average of x """
@@ -117,8 +114,7 @@ class NN(object):
             args['L'] = np.outer(args['d'], dpinv)
         else:
             if 'L' not in args:
-                args['L'] = np.random.randn(args['n_neurons'], args['n_neurons'])
-                args['L'] = np.divide(args['L'], math.sqrt(args['n_neurons']))
+                args['L'] = np.random.randn(args['n_neurons'], args['n_neurons']) * (args['g']/ math.sqrt(args['n_neurons']))
                 np.fill_diagonal(args['L'], 0)
         if(args['connectivity'] != 1):
             args['connectivity_mask'] = mask_matrix(args['n_neurons'], args['connectivity'])
@@ -132,7 +128,11 @@ class NN(object):
 
     def update_a(self):
         """ Update activity of network (Equation 1) """
-        self.args['a'] = self.args['a']*(1-self.args['dt']) + self.args['dt']*(np.dot(self.args['L'], self.args['r']))
+        if(self.args['v_alpha'] ==0):
+            self.args['a'] = self.args['a']*(1-self.args['dt']) + self.args['dt']*(np.dot(self.args['L'], self.args['r']))
+        else:
+            noise = self.args['v_alpha'] * np.random.normal() * self.args['dt']*(np.dot(self.args['L'], self.args['r']))
+            self.args['a'] = self.args['a']*(1-self.args['dt']) + self.args['dt']*(np.dot(self.args['L'], self.args['r'])) + noise 
 
     def update_r(self):
         """ Update firing rates of network """
@@ -165,8 +165,6 @@ class NN(object):
         dsdt = self.calc_dsdt()
         dL = (np.repeat(np.dot(self.args['q'],dsdt), self.args['n_neurons'])).reshape(self.args['n_neurons'],self.args['n_neurons']) 
         dL = dL * 2 * self.args['eta'] * np.transpose(self.args['r']) * drdt
-        if(self.args['dL_hist']):
-            self.args['dL'] = -dL
         if(self.args['alpha'] != 0):
             noise = self.args['alpha'] * dL * np.random.normal()
             if(self.args['FEVER']):
@@ -192,8 +190,6 @@ class NN(object):
             dsdt = self.args['feedback'].ix[feedback_t]
         dL = (np.repeat(np.dot(self.args['q'],dsdt), self.args['n_neurons'])).reshape(self.args['n_neurons'],self.args['n_neurons']) 
         dL = dL * 2 * self.args['eta'] * np.transpose(self.args['r']) * drdt
-        if(self.args['dL_hist']):
-            self.args['dL'] = -dL
         if(self.args['alpha'] != 0):
             noise = self.args['alpha'] * dL * np.random.normal()
             if(self.args['FEVER']):
@@ -218,23 +214,14 @@ class Sim(object):
         """ Returns a new NetworkSimulation object with specified parameters or copies parameters from Sim_copy """
         args['NNt'] = NNt
         args['steps'] = args['ms'] / (args['dt'] * args['tau'] * 20)
-        args['stepsperms'] = 1 / (args['dt']*args['tau']*20)
-        ######## storing info 
+        args['stepsperms'] = 1 / (args['dt']*args['tau']*20) 
         if(args['store_frs']):
             args['frs'] = pd.DataFrame(np.zeros((args['ms'], args['nrs'])))
             args['frs_idx'] = np.random.choice(list(range(args['n_neurons'])), args['nrs'])
         args['initial_stim'] = args['NNt'].calc_s()
         args['sdf'] = pd.DataFrame(np.zeros((args['ms'], args['n_stim']))) ### stim values
         if(args['frac_tuned'] == 0):
-            args['tuned'] = False
-        if(args['L_hist']):
-            args['L_hists'] = list()
-        if(args['dL_hist']):
-            args['dL_hists'] = list()    
-        if(args['store_weights']):
-            args['weights'] =  pd.DataFrame(np.zeros((args['ms'], args['nLs'])))
-            args['Ls_idx_1'] = np.random.choice(list(range(args['n_neurons'])), args['nLs'])
-            args['Ls_idx_2'] = np.random.choice(list(range(args['n_neurons'])), args['nLs'])
+            args['tuned'] = False  
         if(args['delay']):
             args['feedback'] = pd.DataFrame(np.zeros((int(args['steps']), args['n_stim'])))
         self.args = args
@@ -245,26 +232,10 @@ class Sim(object):
         for i in range(self.args['n_stim']):
             self.args['sdf'][i][mst] = s[0][i]
     
-    def update_weights(self, mst):
-        """ Update weights dataframe """
-        Ls = list()
-        for k, idx in enumerate(self.args['Ls_idx_1']):
-            j = self.args['Ls_idx_2'][k]
-            Ls.append(self.args['L'][idx][j])
-        self.args['weights'].ix[mst] = Ls
-    
     def update_frs(self, mst):
         """ Update the neural activities in dataframe activities """
         frs = [r for sublist in self.args['r'][self.args['frs_idx']].tolist() for r in sublist]
         self.args['frs'].ix[mst] = frs
-
-    def store_L_hist(self):
-        """ store values for histogram """
-        self.args['L_hists'].append(self.args['L'])
-    
-    def store_dL_hist(self):
-        """ store values for histogram """
-        self.args['dL_hists'].append(self.args['dL'])
 
     def update_feedback(self, t):
         """ stores feedback for delayed plasticity """
@@ -284,14 +255,6 @@ class Sim(object):
                     self.update_frs(mst)
                 if(self.args['updates'] and t % 5000 ==0): ## printing updates 
                     print(str(mst) +  ' ms ' +  str(self.args['NNt'].calc_s()))
-                if(self.args['store_weights']):
-                    self.update_weights(mst)
-                if(self.args['L_hist']):
-                    if(mst==0 or mst == 1500 or mst == 2999):
-                        self.store_L_hist()
-                if(self.args['dL_hist']):
-                    if(mst==1 or mst == 1500 or mst == 2999):
-                        self.store_dL_hist()
             if(self.args['delay']):
                 self.update_feedback(t)
             self.args['NNt'].update_a()

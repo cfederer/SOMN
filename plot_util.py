@@ -22,9 +22,10 @@ def plot_args(poster=False, n_curves = 2, FEVER=False, rb=True):
     else: 
         pa['text_size'] = 20
         pa['label_size'] = 15
-        pa['ylabel_size'] = 22
+        
         pa['tick_label_size'] = 12
         pa['linewidth'] = 4.0
+    pa['ylabel_size'] = 22
     pa['title_size'] = pa['label_size']
     pa['title'] = ' ' 
     pa['xlabel'] = 'Time (ms)'
@@ -212,6 +213,75 @@ def plot_argslist(args_list, pa):
 def plot_activities(dft, dfu, frst, frsu, pa):
     """ Plot dynamics  for Fig. 2A """
     height = 2
+    width = 10
+    txtcolor = 'black'
+    blue = 'blue'
+    red = 'red'
+    ms = 500
+    xspots = np.linspace(0, ms-10, 3)
+    txspots = [xspots[0], xspots[1]-60, xspots[2]-85]
+    x = list(range(len(frst[:ms])))
+    fig = plt.figure(1)
+    fig.text(0.04, 0.5, 'Firing Rates $r_i(t)$' , ha='center', va='center',
+             rotation='vertical', fontsize=pa['text_size'], color=txtcolor, fontweight='bold')
+    ####### Constant Synapse section 
+    ax2 = fig.add_subplot(212)
+    t1 =ax2.set_title('Constant Random Synapse', fontsize =pa['text_size'], fontweight='bold', color='black')
+    t1.set_position([.5, 1.12])
+
+    pylab.ylim([0, height])
+    pylab.xlim([0, len(frsu[:ms])-1])
+    
+    #txspots = [xspots[0] , xspots[1], xspots[2]] 
+    tyspot = height + .01
+    yspot = 0
+    currentAxis = plt.gca()
+    ax2.set_xlabel('Time (ms) ', fontsize=pa['text_size'], color=txtcolor, fontweight='bold')
+    for i in range(len(xspots)):
+        currentAxis.add_patch(Rectangle((xspots[i], 0), width, height, facecolor="lightgrey", edgecolor=blue))### add gray bars
+        plt.text(txspots[i], tyspot, r'$\hat{s}(t) = $' + str(np.round(dfu['0'][(int(xspots[i]))], 2)), color=blue, fontsize =pa['text_size'], fontweight='bold') ### add text 
+        #plt.text(xspots[i], tyspot, r'$s = \sum_{i=0} d_i r_i$' +'=' + str(np.round(dfu.ix(int(xspots[i])), 2)), color=blue, fontsize =pa['text_size'], fontweight='bold') ### add text 
+    for i in range(len(frsu.columns)):
+        a, = plt.plot(x, frsu[str(i)][:ms],  red, linestyle='--',linewidth=2.0)
+
+    ###### Plastic synapse section
+    txspots = [xspots[0], xspots[1]-60, xspots[2]-110]
+    ax1 = fig.add_subplot(211)
+    t2 = ax1.set_title('Plastic Random Synapse', fontsize = pa['text_size'], fontweight='bold', color='black')
+    t2.set_position([.5, 1.14])
+    ax1.tick_params(
+                    axis='x',          # changes apply to the x-axis
+                    which='both',      # both major and minor ticks are affected
+                    bottom='off',      # ticks along the bottom edge are off
+                    top='off',         # ticks along the top edge are off
+                    labelbottom='off') # labels along the bottom edge are off
+    pylab.ylim([0, height])
+    pylab.xlim([0, len(frst[:ms])-1])
+    currentAxis = plt.gca()
+    for i in range(len(xspots)):
+        currentAxis.add_patch(Rectangle((xspots[i], 0), width, height, facecolor="lightgrey", edgecolor=blue)) ### add gray bars
+        plt.text(txspots[i], tyspot, r'$\hat{s}(t) = $' +str(np.round(dft['0'][(int(xspots[i]))], 2)), color=blue, fontsize =pa['text_size'], fontweight='bold') ### add text 
+
+        #plt.text(xspots[i], tyspot, r'$s = \sum_{i=0} d_i r_i$' +'=' + str(np.round(dft.ix(int(xspots[i])), 2)), color=blue,fontsize =pa['text_size'], fontweight='bold') ### add text 
+    for i in range(len(frst.columns)):
+        a, = plt.plot(x,frst[str(i)][:ms], red, linestyle='--', linewidth=2.0)
+
+    ## plot final 
+    plt.subplots_adjust(hspace = .3)
+    plt.setp(ax1.get_xticklabels(), fontsize=pa['tick_label_size'])
+    plt.setp(ax1.get_yticklabels(), fontsize=pa['tick_label_size'])
+    plt.setp(ax2.get_xticklabels(), fontsize=pa['tick_label_size'])
+    plt.setp(ax2.get_yticklabels(), fontsize=pa['tick_label_size'])
+    if(pa['show']):
+        plt.show()
+    if(pa['save']):
+        fig.savefig('plots/' + pa['save_as'] + '.eps', dpi=1200)
+    plt.close() 
+    return True
+
+def plot_activities_chaos(dft, dfu, frst, frsu, pa):
+    """ Plot dynamics  for Fig. 2A """
+    height = 4
     width = 10
     txtcolor = 'black'
     blue = 'blue'
