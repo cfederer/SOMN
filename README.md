@@ -1,10 +1,10 @@
-### Self Organizing Memory Network (SOMN)
+# Self Organizing Memory Network (SOMN)
 
 This code will reproduce results from Federer & Zylberberg A self-organizing short-term dynamical memory network. We derived biologically plausible synaptic plasticity rules that dynamically modify the connection matrix to enable information storing in a neural network.
 
 Paper: https://www.ncbi.nlm.nih.gov/pubmed/30007123 
 
-### Guide to Running the Code
+# Guide to Running the Code
 ## NN.py 
 A neural network object with pre-set arguments to run results as shown in the paper. The Sim (simulation) class takes a neural network and runs through a simulation and stores the output. 
 
