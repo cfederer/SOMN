@@ -24,6 +24,7 @@ def get_args():
     args_dict['abs_d'] = True                            ## abs values of read-out, d
     args_dict['tau'] = 1                                 ## time scale 
     args_dict['store_frs'] = False                       ## store firing rates for Fig 2A
+    args_dict['store_drs'] = False 
     args_dict['frac_tuned'] = 1                          ## fraction of plastic synapses
     args_dict['connectivity'] = 1                        ## connection probability
     args_dict['FEVER'] = False                           ## runs FEVER like entwork (Druckmann & Chklovskii Curr Biol 2012)
@@ -152,9 +153,9 @@ class NN(object):
         """ Calculate and return change in stim """
         drdt = self.drdt()
         if(self.args['n_stim'] >1):
-            dsdt = (np.transpose(np.dot(np.transpose(self.args['d']*d_relu(self.args['a'])),  (-self.args['a'] + np.dot(self.args['L'],self.args['r'])))))[0]
+            dsdt = (np.transpose(np.dot(np.transpose(self.args['d']*drdt),  (-self.args['a'] + np.dot(self.args['L'],self.args['r'])))))[0]
         else:
-            dsdt = np.vdot(self.args['d']*d_relu(self.args['a']), (-self.args['a'] + np.dot(self.args['L'],self.args['r'])))
+            dsdt = np.vdot(self.args['d']*drdt, (-self.args['a'] + np.dot(self.args['L'],self.args['r'])))
         if(self.args['error'] == 'binary'):
             return(binary_updates(dsdt))
         return dsdt 
@@ -218,6 +219,8 @@ class Sim(object):
         if(args['store_frs']):
             args['frs'] = pd.DataFrame(np.zeros((args['ms'], args['nrs'])))
             args['frs_idx'] = np.random.choice(list(range(args['n_neurons'])), args['nrs'])
+        if(args['store_drs']):
+            args['drs'] = pd.DataFrame(np.zeros((args['ms'], args['n_neurons'])))
         args['initial_stim'] = args['NNt'].calc_s()
         args['sdf'] = pd.DataFrame(np.zeros((args['ms'], args['n_stim']))) ### stim values
         if(args['frac_tuned'] == 0):
@@ -237,6 +240,10 @@ class Sim(object):
         frs = [r for sublist in self.args['r'][self.args['frs_idx']].tolist() for r in sublist]
         self.args['frs'].ix[mst] = frs
 
+    def update_drs(self, mst):
+        drs = self.args['NNt'].drdt().reshape(self.args['n_neurons'],)
+        self.args['drs'].ix[mst] = drs 
+
     def update_feedback(self, t):
         """ stores feedback for delayed plasticity """
         self.args['feedback'].ix[t] = self.args['NNt'].calc_dsdt()
@@ -255,6 +262,8 @@ class Sim(object):
                     self.update_frs(mst)
                 if(self.args['updates'] and t % 5000 ==0): ## printing updates 
                     print(str(mst) +  ' ms ' +  str(self.args['NNt'].calc_s()))
+                if(self.args['store_drs']):
+                    self.update_drs(mst)
             if(self.args['delay']):
                 self.update_feedback(t)
             self.args['NNt'].update_a()
